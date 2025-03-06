@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- CANopen 관리자 노드 실행 -->
+  <node name="canopen_manager" pkg="canopen_manager" type="canopen_node.py" output="screen">
+    <!-- 파라미터 설정 -->
+    <param name="can_interface" value="can0" />
+    <param name="node_id" value="1" />
+    <param name="heartbeat_interval" value="1000" /> <!-- ms -->
+    <param name="can_bitrate" value="1000000" /> <!-- 1Mbps -->
+    <param name="can_txqueuelen" value="1000" />
+  </node>
+</launch> 
