@@ -43,11 +43,9 @@ def setup_can_interface(interface, bitrate=1000000, txqueuelen=1000):
     if not is_root:
         rospy.logwarn("CAN 인터페이스 설정에는 root 권한이 필요합니다.")
         rospy.logwarn("다음 명령을 수동으로 실행하거나, sudo로 노드를 실행하세요:")
-        rospy.logwarn("sudo modprobe peak_usb")
-        rospy.logwarn(f"sudo ip link set {interface} down")
-        rospy.logwarn(f"sudo ip link set {interface} type can bitrate {bitrate}")
-        rospy.logwarn(f"sudo ip link set {interface} txqueuelen {txqueuelen}")
+        rospy.logwarn("sudo slcand -o -s8 /dev/ttyACM0 can0")
         rospy.logwarn(f"sudo ip link set {interface} up")
+        rospy.logwarn(f"sudo ip link set {interface} txqueuelen {txqueuelen}")
         
         # 인터페이스가 이미 활성화되어 있는지 확인
         if is_can_interface_up(interface):
@@ -57,25 +55,25 @@ def setup_can_interface(interface, bitrate=1000000, txqueuelen=1000):
             rospy.logwarn("CAN 인터페이스 %s가 활성화되어 있지 않습니다.", interface)
             return False
     
-    # PEAK USB 드라이버 로드
-    success, output = run_command("modprobe peak_usb")
-    if not success:
-        rospy.logwarn("PEAK USB 드라이버 로드 실패: %s", output)
-        rospy.loginfo("이미 로드되어 있거나 다른 드라이버를 사용 중일 수 있습니다.")
-    else:
-        rospy.loginfo("PEAK USB 드라이버 로드 성공")
-    
     # 인터페이스가 이미 활성화되어 있는지 확인
     if is_can_interface_up(interface):
         rospy.loginfo("CAN 인터페이스 %s가 이미 활성화되어 있습니다.", interface)
         return True
     
+    # CANable2 설정 (slcan 사용)
+    success, output = run_command("slcand -o -s8 /dev/ttyACM0 can0")
+    if not success:
+        rospy.logwarn("slcand 실행 실패: %s", output)
+        rospy.loginfo("이미 실행 중이거나 장치에 문제가 있을 수 있습니다.")
+    else:
+        rospy.loginfo("slcand 실행 성공")
+        # slcand가 인터페이스를 설정할 시간을 줍니다
+        time.sleep(1)
+    
     # 인터페이스 설정
     commands = [
-        f"ip link set {interface} down",
-        f"ip link set {interface} type can bitrate {bitrate}",
-        f"ip link set {interface} txqueuelen {txqueuelen}",
-        f"ip link set {interface} up"
+        f"ip link set {interface} up",
+        f"ip link set {interface} txqueuelen {txqueuelen}"
     ]
     
     for cmd in commands:

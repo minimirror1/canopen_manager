@@ -1,0 +1,68 @@
+# Python 관련 파일
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ROS 관련 파일
+devel/
+logs/
+.catkin_workspace
+.catkin_tools/
+build_isolated/
+devel_isolated/
+install_isolated/
+
+# IDE 관련 파일
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 운영체제 관련 파일
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 로그 파일
+*.log
+
+# 백업 파일
+*~
+*.bak
+
+# 컴파일된 바이너리
+*.o
+*.a
+*.so
+*.dll
+*.dylib
+
+# 기타 파일
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/ 
