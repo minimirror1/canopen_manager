@@ -28,13 +28,11 @@ source devel/setup.bash
 
 이 패키지는 CAN 인터페이스를 자동으로 설정하려고 시도합니다. 하지만 CAN 인터페이스 설정에는 root 권한이 필요합니다. 다음 두 가지 방법 중 하나를 선택할 수 있습니다:
 
-1. 노드를 실행하기 전에 수동으로 CAN 인터페이스 설정:
+1. 노드를 실행하기 전에 수동으로 CAN 인터페이스 설정 (CANable 사용):
    ```bash
-   sudo modprobe peak_usb
-   sudo ip link set can0 down
-   sudo ip link set can0 type can bitrate 1000000
-   sudo ip link set can0 txqueuelen 1000
+   sudo slcand -o -s8 -t hw -S 1000000 /dev/ttyACM0 can0
    sudo ip link set can0 up
+   sudo ip link set can0 txqueuelen 1000
    ```
 
 2. 노드를 root 권한으로 실행:
