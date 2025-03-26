@@ -8,6 +8,7 @@ import json
 import subprocess
 import time
 from std_msgs.msg import String, Float64
+from sensor_msgs.msg import JointState
 
 # 상대 경로를 사용하여 모듈 임포트
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -109,8 +110,7 @@ class CANopenManager:
         self.motors_info = self.load_motors_info()
         
         # 발행자 설정
-        self.status_pub = rospy.Publisher('canopen/status', String, queue_size=10)
-        self.position_pubs = {}  # 모터별 위치 발행자
+        self.joint_state_pub = rospy.Publisher('canopen/joint_states', JointState, queue_size=10)
         
         # 구독자 설정
         rospy.Subscriber('canopen/command', String, self.command_callback)
@@ -124,16 +124,9 @@ class CANopenManager:
                 motor = MotorFactory.create_motor(motor_info)
                 self.motor_controller.add_motor(motor)
                 
-                # 모터별 위치 발행자 및 구독자 설정
+                # 모터별 위치 명령 구독자 설정
                 motor_name = motor_info['name']
                 node_id = motor_info['node_id']
-                
-                # 위치 발행자 설정
-                self.position_pubs[node_id] = rospy.Publisher(
-                    f'canopen/{motor_name}/position', 
-                    Float64, 
-                    queue_size=10
-                )
                 
                 # 위치 명령 구독자 설정
                 rospy.Subscriber(
@@ -203,34 +196,48 @@ class CANopenManager:
         
     def publish_status(self):
         """
-        CANopen 상태를 발행합니다
+        CANopen 상태를 JointState 메시지로 발행합니다
         """
-        status_msg = String()
+        joint_state_msg = JointState()
+        joint_state_msg.header.stamp = rospy.Time.now()
+        joint_state_msg.header.frame_id = "base_link"  # 프레임 ID 설정
         
         if self.motor_controller:
             try:
                 positions = self.motor_controller.get_positions()
                 
-                # 상태 메시지 생성
-                status_parts = ["CANopen 장치 상태: 정상"]
-                for node_id, position in positions.items():
-                    status_parts.append(f"노드ID={node_id}, 위치={position:.2f}")
+                # JointState 메시지 생성
+                joint_names = []
+                joint_positions = []
                 
-                status_msg.data = " | ".join(status_parts)
+                # 각 모터의 위치 정보 저장
+                for motor_info in self.motors_info:
+                    node_id = motor_info['node_id']
+                    motor_name = motor_info['name']
+                    
+                    if node_id in positions:
+                        position = positions[node_id]
+                        joint_names.append(motor_name)
+                        joint_positions.append(position)
                 
-                # 각 모터의 위치 발행
-                for node_id, position in positions.items():
-                    if node_id in self.position_pubs:
-                        pos_msg = Float64()
-                        pos_msg.data = position
-                        self.position_pubs[node_id].publish(pos_msg)
+                # JointState 메시지 채우기
+                joint_state_msg.name = joint_names
+                joint_state_msg.position = joint_positions
+                joint_state_msg.velocity = []  # 속도 정보는 없음
+                joint_state_msg.effort = []    # 토크 정보는 없음
+                
+                # 상태가 정상인 경우 로그 출력
+                if joint_names:
+                    rospy.logdebug("CANopen 장치 상태: 정상")
                 
             except Exception as e:
-                status_msg.data = f"CANopen 장치 상태: 오류 ({str(e)})"
+                rospy.logerr("CANopen 장치 상태: 오류 (%s)", str(e))
         else:
-            status_msg.data = "CANopen 장치 상태: 초기화되지 않음"
-            
-        self.status_pub.publish(status_msg)
+            rospy.logdebug("CANopen 장치 상태: 초기화되지 않음")
+        
+        # JointState 메시지 발행
+        if joint_state_msg.name:  # 이름 배열이 비어있지 않은 경우에만 발행
+            self.joint_state_pub.publish(joint_state_msg)
         
     def run(self):
         """
