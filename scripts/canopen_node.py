@@ -113,7 +113,7 @@ class CANopenManager:
         self.joint_state_pub = rospy.Publisher('canopen/joint_states', JointState, queue_size=10)
         
         # 구독자 설정
-        rospy.Subscriber('canopen/command', String, self.command_callback)
+        rospy.Subscriber('canopen/multiple_joints', JointState, self.multiple_joints_callback)
         
         # 모터 컨트롤러 초기화
         try:
@@ -130,9 +130,9 @@ class CANopenManager:
                 
                 # 위치 명령 구독자 설정
                 rospy.Subscriber(
-                    f'canopen/{motor_name}/set_position',
+                    f'canopen/single_motor/{motor_name}/position',
                     Float64,
-                    lambda msg, id=node_id: self.position_callback(msg, id)
+                    lambda msg, id=node_id: self.single_motor_position_callback(msg, id)
                 )
             
             # 모터 초기화
@@ -167,25 +167,34 @@ class CANopenManager:
             rospy.logerr("모터 정보 로드 실패: %s", str(e))
             return []
     
-    def command_callback(self, msg):
+    def multiple_joints_callback(self, msg):
         """
-        CANopen 명령을 처리하는 콜백 함수
+        여러 관절의 위치를 동시에 제어하는 콜백 함수
         """
-        rospy.loginfo("수신된 명령: %s", msg.data)
+        if not self.motor_controller:
+            rospy.logwarn("모터 컨트롤러가 초기화되지 않았습니다.")
+            return
+
+        try:
+            # JointState 메시지의 각 관절에 대해 위치 명령을 처리
+            for i, joint_name in enumerate(msg.name):
+                if i < len(msg.position):
+                    # 모터 정보에서 해당 관절의 node_id 찾기
+                    motor_info = next((m for m in self.motors_info if m['name'] == joint_name), None)
+                    if motor_info:
+                        node_id = motor_info['node_id']
+                        position = msg.position[i]
+                        self.motor_controller.set_position(node_id, position)
+                        rospy.loginfo("위치 명령 전송: 관절=%s, 노드ID=%d, 위치=%.2f", 
+                                    joint_name, node_id, position)
+                    else:
+                        rospy.logwarn("알 수 없는 관절 이름: %s", joint_name)
+        except Exception as e:
+            rospy.logerr("위치 명령 처리 중 오류 발생: %s", str(e))
         
-        # 명령 처리
-        if msg.data == "reset":
-            if self.motor_controller:
-                self.motor_controller.reset_all()
-                rospy.loginfo("모터 리셋 완료")
-        elif msg.data == "init":
-            if self.motor_controller:
-                self.motor_controller.init_all()
-                rospy.loginfo("모터 초기화 완료")
-    
-    def position_callback(self, msg, node_id):
+    def single_motor_position_callback(self, msg, node_id):
         """
-        위치 명령을 처리하는 콜백 함수
+        단일 모터의 위치를 제어하는 콜백 함수
         """
         if self.motor_controller:
             try:
