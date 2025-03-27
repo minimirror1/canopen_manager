@@ -136,7 +136,7 @@ class CANopenManager:
                 )
             
             # 모터 초기화
-            self.motor_controller.all_motors_init_start(interval=0.01)
+            self.motor_controller.all_motors_init_start(interval=10.01)
             
             rospy.loginfo("모터 초기화 완료")
         except Exception as e:
@@ -215,13 +215,15 @@ class CANopenManager:
             try:
                 positions = self.motor_controller.get_positions()
                 velocities = self.motor_controller.get_velocities()
+                torques = self.motor_controller.get_torques()  # 토크 정보 가져오기
                 
                 # JointState 메시지 생성
                 joint_names = []
                 joint_positions = []
                 joint_velocities = []
+                joint_efforts = []  # 토크 정보를 저장할 리스트
                 
-                # 각 모터의 위치와 속도 정보 저장
+                # 각 모터의 위치, 속도, 토크 정보 저장
                 for motor_info in self.motors_info:
                     node_id = motor_info['node_id']
                     motor_name = motor_info['name']
@@ -229,15 +231,18 @@ class CANopenManager:
                     if node_id in positions:
                         position = positions[node_id]
                         velocity = velocities.get(node_id, 0.0)  # 속도 정보가 없으면 0으로 설정
+                        torque = torques.get(node_id, 0.0)  # 토크 정보가 없으면 0으로 설정
+                        
                         joint_names.append(motor_name)
                         joint_positions.append(position)
                         joint_velocities.append(velocity)
+                        joint_efforts.append(torque)  # 토크 정보 추가
                 
                 # JointState 메시지 채우기
                 joint_state_msg.name = joint_names
                 joint_state_msg.position = joint_positions
                 joint_state_msg.velocity = joint_velocities
-                joint_state_msg.effort = []    # 토크 정보는 없음
+                joint_state_msg.effort = joint_efforts  # 토크 정보 설정
                 
                 # 상태가 정상인 경우 로그 출력
                 if joint_names:

@@ -195,3 +195,10 @@ class MotorController:
             self.set_position(motor_id, value)
         else:
             print(f"Motor with name {name} not found")
+
+    def get_torques(self):
+        """등록된 모든 모터의 토크를 dict로 반환"""        
+        torques = {}
+        for node_id, motor in self.motors.items():
+            torques[node_id] = motor.get_torque()
+        return torques

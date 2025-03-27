@@ -187,12 +187,12 @@ class MotorVendorZeroErr(AbstractMotor):
         self.network.subscribe(self.node.tpdo[2].cob_id, self.node.tpdo[2].on_message)
         self.node.tpdo[2].add_callback(self.tpdo2_callback)
 
-    def set_position(self, value):  # value in radians
+    def set_position(self, value):  # value in radians        
         """모터 위치 명령 (라디안 단위)"""
         #print(f"[MotorVendorZeroErr] Set position to {value} rad, node: {self.node_id}")
         self.node.rpdo[1]['Controlword'].phys = 0x2f
         
-        # 목표 위치를 라디안 단위로 저장
+        # # 목표 위치를 라디안 단위로 저장
         self.target_position = value
         
         # 라디안 값을 펄스로 변환한 후 zero_offset(펄스)을 더함
@@ -200,11 +200,11 @@ class MotorVendorZeroErr(AbstractMotor):
         self.node.rpdo[1]['Target Position'].phys = position_pulse
         self.node.rpdo[1].transmit()
 
-        #print(f"zero_offset: {self.zero_offset} pulse, target_position_pulse: {position_pulse}")
+        # print(f"zero_offset: {self.zero_offset} pulse, target_position_pulse: {position_pulse}")
 
         self.node.rpdo[1]['Controlword'].phys = 0x3f
         self.node.rpdo[1].transmit()
-
+        
     def get_position(self):        
         # self.current_position = self.node.sdo['Position actual value'].raw
         # print(f"[MotorVendorZeroErr] Get position, node: {self.node_id}, position: {self.current_position}")
@@ -222,7 +222,9 @@ class MotorVendorZeroErr(AbstractMotor):
         self.node.rpdo[1]['Controlword'].phys = 0x3f
         self.node.rpdo[1].transmit()       
 
-    def get_torque(self):
+    def get_torque(self):        
+        # CANopen 노드에서 토크 값을 읽어옴
+        self.current_torque_sensor = self.node.sdo['Torque sensor'].raw / 1000  # mN.m을 N.m으로 변환
         return self.current_torque_sensor
     
     def get_velocity(self):

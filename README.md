@@ -64,7 +64,7 @@ launch 파일에서 다음 파라미터를 설정할 수 있습니다:
   - name: 모터 이름 배열
   - position: 현재 위치 배열 (라디안)
   - velocity: 속도 배열 (rad/s)
-  - effort: 토크 배열 (현재 미사용)
+  - effort: 토크 배열 (N⋅m, 뉴턴미터)
 
 #### 구독 토픽
 
