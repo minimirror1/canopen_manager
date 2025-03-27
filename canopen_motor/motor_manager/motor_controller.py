@@ -120,6 +120,13 @@ class MotorController:
             positions[node_id] = motor.get_position()
         return positions
     
+    def get_velocities(self):
+        """등록된 모든 모터의 속도를 dict로 반환"""        
+        velocities = {}
+        for node_id, motor in self.motors.items():
+            velocities[node_id] = motor.get_velocity()
+        return velocities
+    
     def set_torque_all(self, value):
         for node_id, motor in self.motors.items():
             motor.set_torque(value)

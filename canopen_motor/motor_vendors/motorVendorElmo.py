@@ -199,10 +199,10 @@ class MotorVendorElmo(AbstractMotor):
     def tpdo2_callback(self, message):
         self.current_torque = int.from_bytes(message.data[0:2], byteorder='little', signed=True)
         velocity_pulse = int.from_bytes(message.data[2:6], byteorder='little', signed=True)
-        self.current_velocity = velocity_pulse * self.plusToRad
+        self.velocity_actual_value = velocity_pulse * self.plusToRad
         
-        self.current_acceleration = (self.current_velocity - self.current_velocity_old) / self.dt
-        self.current_velocity_old = self.current_velocity
+        self.current_acceleration = (self.velocity_actual_value - self.current_velocity_old) / self.dt
+        self.current_velocity_old = self.velocity_actual_value
 
     def reset(self):
         print(f"[MotorVendorElmo] Reset motor node: {self.node_id}")
@@ -215,7 +215,7 @@ class MotorVendorElmo(AbstractMotor):
         self.node.sdo['controlword'].raw = 0x0F  # Operation enabled
 
     def get_velocity(self):
-        return self.current_velocity
+        return self.velocity_actual_value
 
     def get_acceleration(self):
         return self.current_acceleration

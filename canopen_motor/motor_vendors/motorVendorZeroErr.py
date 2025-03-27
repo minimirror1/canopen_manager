@@ -226,7 +226,7 @@ class MotorVendorZeroErr(AbstractMotor):
         return self.current_torque_sensor
     
     def get_velocity(self):
-        return self.current_velocity
+        return self.velocity_actual_value
     
     def get_acceleration(self):
         return self.current_acceleration
@@ -248,11 +248,11 @@ class MotorVendorZeroErr(AbstractMotor):
 
         pulse_velocity = int.from_bytes(message.data[4:7], byteorder='little', signed=True)
 
-        self.current_velocity = pulse_velocity * self.plusToRad  # rad/s로 변환
-        #print(f'TPDO2 Velocity actual value: {self.current_velocity} rad/s')
+        self.velocity_actual_value = pulse_velocity * self.plusToRad  # rad/s로 변환
+        #print(f'TPDO2 Velocity actual value: {self.velocity_actual_value} rad/s')
         
-        self.current_acceleration = (self.current_velocity - self.current_velocity_old) / self.dt
-        self.current_velocity_old = self.current_velocity
+        self.current_acceleration = (self.velocity_actual_value - self.current_velocity_old) / self.dt
+        self.current_velocity_old = self.velocity_actual_value
         #print(f'TPDO2 Acceleration: {self.current_acceleration} rad/s^2')
 
         # 로깅이 활성화된 경우 데이터 저장
@@ -262,7 +262,7 @@ class MotorVendorZeroErr(AbstractMotor):
                 f"{current_time:.1f}",
                 f"{self.current_position:.6f}",
                 f"{self.current_torque_sensor:.6f}",
-                f"{self.current_velocity:.6f}",
+                f"{self.velocity_actual_value:.6f}",
                 f"{self.current_acceleration:.6f}"
             ])
 

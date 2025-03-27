@@ -31,7 +31,7 @@ class AbstractMotor(ABC):
 
         self.current_position = 0       # 현재 위치값 저장용 변수
         self.current_torque_sensor = 0  # 현재 토크값 저장용 변수
-        self.current_velocity = 0       # 현재 속도값 저장용 변수
+        self.velocity_actual_value = 0       # 현재 속도값 저장용 변수
         self.current_velocity_old = 0   # 이전 속도값 저장용 변수
         self.current_acceleration = 0   # 현재 가속도값 저장용 변수
 

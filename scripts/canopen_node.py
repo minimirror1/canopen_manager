@@ -214,25 +214,29 @@ class CANopenManager:
         if self.motor_controller:
             try:
                 positions = self.motor_controller.get_positions()
+                velocities = self.motor_controller.get_velocities()
                 
                 # JointState 메시지 생성
                 joint_names = []
                 joint_positions = []
+                joint_velocities = []
                 
-                # 각 모터의 위치 정보 저장
+                # 각 모터의 위치와 속도 정보 저장
                 for motor_info in self.motors_info:
                     node_id = motor_info['node_id']
                     motor_name = motor_info['name']
                     
                     if node_id in positions:
                         position = positions[node_id]
+                        velocity = velocities.get(node_id, 0.0)  # 속도 정보가 없으면 0으로 설정
                         joint_names.append(motor_name)
                         joint_positions.append(position)
+                        joint_velocities.append(velocity)
                 
                 # JointState 메시지 채우기
                 joint_state_msg.name = joint_names
                 joint_state_msg.position = joint_positions
-                joint_state_msg.velocity = []  # 속도 정보는 없음
+                joint_state_msg.velocity = joint_velocities
                 joint_state_msg.effort = []    # 토크 정보는 없음
                 
                 # 상태가 정상인 경우 로그 출력
