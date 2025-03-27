@@ -59,13 +59,24 @@ launch 파일에서 다음 파라미터를 설정할 수 있습니다:
 
 #### 발행 토픽
 
-- `/canopen/status` (std_msgs/String): CANopen 장치의 상태 정보
-- `/canopen/position` (std_msgs/Float64): 현재 모터 위치 (라디안)
+- `/canopen/joint_states` (sensor_msgs/JointState)
+  - 모든 모터의 현재 상태 정보를 발행
+  - name: 모터 이름 배열
+  - position: 현재 위치 배열 (라디안)
+  - velocity: 속도 배열 (현재 미사용)
+  - effort: 토크 배열 (현재 미사용)
 
 #### 구독 토픽
 
-- `/canopen/command` (std_msgs/String): CANopen 장치에 보낼 명령
-- `/canopen/set_position` (std_msgs/Float64): 모터 위치 설정 (라디안)
+- `/canopen/multiple_joints` (sensor_msgs/JointState)
+  - 여러 모터의 위치를 동시에 제어
+  - name: 제어할 모터 이름 배열
+  - position: 목표 위치 배열 (라디안)
+
+- `/canopen/single_motor/{motor_name}/position` (std_msgs/Float64)
+  - 특정 모터의 위치를 개별적으로 제어
+  - data: 목표 위치 (라디안)
+  - {motor_name}은 JSON 설정 파일에 정의된 모터 이름으로 대체
 
 ### 명령 보내기
 
