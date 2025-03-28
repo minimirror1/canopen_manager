@@ -38,8 +38,6 @@ class MotorVendorZeroErr(AbstractMotor):
 
         self.plusToRad = 2 * pi / self.PULSE_PER_REVOLUTION
         
-        # Disable sync
-        self.network.sync.stop()
         
     def _convert_rad_to_pulse(self, rad_value):
         """라디안 값을 펄스 카운트로 변환"""
@@ -108,10 +106,11 @@ class MotorVendorZeroErr(AbstractMotor):
         # 읽기 : 상태 값, 토크 센서 값
         self.node.tpdo[1].clear()
         self.node.tpdo[1].add_variable('Statusword')
-        self.node.tpdo[1].add_variable('Position actual value')
+        self.node.tpdo[1].add_variable('Position actual value') #aPosition actual value
         self.node.tpdo[1].cob_id = 0x180 + self.node_id
         self.node.tpdo[1].trans_type = 1
-        self.node.tpdo[1].event_timer = 0
+        #self.node.tpdo[1].trans_type = 254  # SYNC마다 전송
+        #self.node.tpdo[1].event_timer = 10
         self.node.tpdo[1].enabled = True
 
         # 읽기 : 속도, 위치
@@ -119,8 +118,9 @@ class MotorVendorZeroErr(AbstractMotor):
         self.node.tpdo[2].add_variable('Torque sensor') #0x3B69, mN.m
         self.node.tpdo[2].add_variable('Velocity actual value') #0x606C, plus/s            
         self.node.tpdo[2].cob_id = 0x280 + self.node_id
-        self.node.tpdo[2].trans_type = 1
-        self.node.tpdo[2].event_timer = 0
+        self.node.tpdo[2].trans_type = 1  # SYNC마다 전
+        #self.node.tpdo[2].trans_type = 254  # SYNC마다 전송
+        #self.node.tpdo[2].event_timer = 10
         self.node.tpdo[2].enabled = True
 
         # motor <- master
@@ -224,7 +224,7 @@ class MotorVendorZeroErr(AbstractMotor):
 
     def get_torque(self):        
         # CANopen 노드에서 토크 값을 읽어옴
-        self.current_torque_sensor = self.node.sdo['Torque sensor'].raw / 1000  # mN.m을 N.m으로 변환
+        # self.current_torque_sensor = self.node.sdo['Torque sensor'].raw / 1000  # mN.m을 N.m으로 변환
         return self.current_torque_sensor
     
     def get_velocity(self):

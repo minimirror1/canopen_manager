@@ -92,6 +92,8 @@ def setup_can_interface(interface, bitrate=1000000, txqueuelen=1000):
 
 class CANopenManager:
     def __init__(self):
+        SYNC_INTERVAL = 0.01
+        
         rospy.init_node('canopen_manager', anonymous=False)
         
         # 파라미터 가져오기
@@ -136,7 +138,7 @@ class CANopenManager:
                 )
             
             # 모터 초기화
-            self.motor_controller.all_motors_init_start(interval=10.01)
+            self.motor_controller.all_motors_init_start(interval=SYNC_INTERVAL)
             
             rospy.loginfo("모터 초기화 완료")
         except Exception as e:
@@ -185,8 +187,8 @@ class CANopenManager:
                         node_id = motor_info['node_id']
                         position = msg.position[i]
                         self.motor_controller.set_position(node_id, position)
-                        rospy.loginfo("위치 명령 전송: 관절=%s, 노드ID=%d, 위치=%.2f", 
-                                    joint_name, node_id, position)
+                        # rospy.loginfo("위치 명령 전송: 관절=%s, 노드ID=%d, 위치=%.2f", 
+                        #             joint_name, node_id, position)
                     else:
                         rospy.logwarn("알 수 없는 관절 이름: %s", joint_name)
         except Exception as e:
@@ -199,7 +201,7 @@ class CANopenManager:
         if self.motor_controller:
             try:
                 self.motor_controller.set_position(node_id, msg.data)
-                rospy.loginfo("위치 명령 전송: 노드ID=%d, 위치=%.2f", node_id, msg.data)
+                #rospy.loginfo("위치 명령 전송: 노드ID=%d, 위치=%.2f", node_id, msg.data)
             except Exception as e:
                 rospy.logerr("위치 명령 전송 실패: %s", str(e))
         

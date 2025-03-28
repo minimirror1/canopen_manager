@@ -15,10 +15,15 @@ class MotorController:
         :param interface: slcan 등의 인터페이스 타입. 설정 시 bustype 대신 사용됨
         """
         self.network = canopen.Network()
-        if interface is None:
-            self.network.connect(channel=channel, bustype=bustype, bitrate=bitrate)
-        else:
-            self.network.connect(interface=interface, channel=channel, bitrate=bitrate)
+        try:
+            if interface is None:
+                self.network.connect(channel=channel, bustype=bustype, bitrate=bitrate)
+            else:
+                self.network.connect(interface=interface, channel=channel, bitrate=bitrate)
+            print(f"CAN bus connected successfully: channel={channel}, bustype={bustype}, bitrate={bitrate}")
+        except Exception as e:
+            print(f"Failed to connect to CAN bus: {e}")
+            raise
         # 등록된 모터 리스트/딕셔너리
         self.motors = {}
         self.name_to_id = {}  # 이름으로 모터 ID를 찾기 위한 매핑 추가
@@ -38,25 +43,31 @@ class MotorController:
         self.name_to_id[motor.name] = motor.node_id  # 이름과 ID 매핑 저장
 
     def all_motors_init_start(self, interval=0.01):
-            # 리셋
+        print("Starting motor initialization sequence...")
+        
+        # 리셋
         self.reset_all()
-        #time.sleep(3) 
+        time.sleep(0.5)  # 리셋 후 잠시 대기
         
         # 모터 전체 초기화
         self.init_all()
-        #time.sleep(3) 
+        time.sleep(0.5)  # 초기화 후 잠시 대기
         
-        # PDO 매핑
+        # PDO 매핑 (활성화)
         self.pdo_mapping_all()
+        time.sleep(0.5)  # PDO 매핑 후 잠시 대기
 
         # Switch On
         self.set_switchOn_all()
+        time.sleep(0.5)  # Switch On 후 잠시 대기
 
         # PDO 콜백 등록
         self.pdo_callback_register_all()
+        time.sleep(0.5)  # 콜백 등록 후 잠시 대기
     
         # 동기화 시작
         self.sync_start(interval)
+        print("Motor initialization sequence completed")
 
     def init_all(self):
         """등록된 모든 모터를 초기화"""
@@ -72,6 +83,13 @@ class MotorController:
         time.sleep(0.5)
         self.network.nmt.send_command(0x82)  # Reset
         time.sleep(1)  # 재설정 후 충분한 대기 시간
+        
+        # NMT 상태 확인
+        try:
+            self.network.nmt.send_command(0x01)  # Start
+            print("NMT state transition to Operational successful")
+        except Exception as e:
+            print(f"Failed to transition NMT state: {e}")
 
     def pdo_mapping_all(self):
         """등록된 모든 모터에 대해 PDO 매핑 설정"""
@@ -94,10 +112,15 @@ class MotorController:
             motor.pdo_callback_register()
 
     def sync_start(self, interval=0.01):
+        print(f"Starting sync with interval: {interval}")
         for node_id, motor in self.motors.items():
             motor.set_dt(interval)
 
-        self.network.sync.start(interval) # 10ms
+        try:
+            self.network.sync.start(interval)
+            print(f"Sync started successfully with interval: {interval}")
+        except Exception as e:
+            print(f"Failed to start sync: {e}")
 
     def sync_stop(self):
         self.network.sync.stop()        
