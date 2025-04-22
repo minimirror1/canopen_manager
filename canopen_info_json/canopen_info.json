@@ -1,15 +1,15 @@
 {
     "motors": [
         {
-            "name": "j_l1",
-            "vendor_type": "VendorZeroErr", 
-            "node_id": 1,            
+            "name": "j_n",
+            "vendor_type": "VendorElmo", 
+            "node_id": 10,            
             "count_per_revolution": 4000,
             "zero_offset": 0,
             "operation_mode": "PROFILE_POSITION",
             "profile_velocity": 2.0,
             "profile_acceleration": 2.0,
             "profile_deceleration": 2.0
-        }
+        }        
     ]
 }

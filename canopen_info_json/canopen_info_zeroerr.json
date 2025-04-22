@@ -1,0 +1,92 @@
+{
+    "motors": [
+        {
+            "name": "j_l1",
+            "vendor_type": "VendorZeroErr", 
+            "node_id": 5,            
+            "count_per_revolution": 4000,
+            "zero_offset": 0,
+            "operation_mode": "PROFILE_POSITION",
+            "profile_velocity": 6.28,
+            "profile_acceleration": 1.57,
+            "profile_deceleration": 1.57
+        },
+        {
+            "name": "j_l2",
+            "vendor_type": "VendorZeroErr", 
+            "node_id": 6,            
+            "count_per_revolution": 4000,
+            "zero_offset": 0,
+            "operation_mode": "PROFILE_POSITION",
+            "profile_velocity": 6.28,
+            "profile_acceleration": 1.57,
+            "profile_deceleration": 1.57
+        },
+        {
+            "name": "j_l3",
+            "vendor_type": "VendorZeroErr", 
+            "node_id": 7,            
+            "count_per_revolution": 4000,
+            "zero_offset": 0,
+            "operation_mode": "PROFILE_POSITION",
+            "profile_velocity": 6.28,
+            "profile_acceleration": 1.57,
+            "profile_deceleration": 1.57
+        },
+        {
+            "name": "j_l4",
+            "vendor_type": "VendorZeroErr", 
+            "node_id": 8,            
+            "count_per_revolution": 4000,
+            "zero_offset": 0,
+            "operation_mode": "PROFILE_POSITION",
+            "profile_velocity": 6.28,
+            "profile_acceleration": 1.57,
+            "profile_deceleration": 1.57
+        },
+        {
+            "name": "j_r1",
+            "vendor_type": "VendorZeroErr", 
+            "node_id": 1,            
+            "count_per_revolution": 4000,
+            "zero_offset": 0,
+            "operation_mode": "PROFILE_POSITION",
+            "profile_velocity": 6.28,
+            "profile_acceleration": 1.57,
+            "profile_deceleration": 1.57
+        },
+        {
+            "name": "j_r2",
+            "vendor_type": "VendorZeroErr", 
+            "node_id": 2,            
+            "count_per_revolution": 4000,
+            "zero_offset": 0,
+            "operation_mode": "PROFILE_POSITION",
+            "profile_velocity": 6.28,
+            "profile_acceleration": 1.57,
+            "profile_deceleration": 1.57
+        },
+        {
+            "name": "j_r3",
+            "vendor_type": "VendorZeroErr", 
+            "node_id": 3,            
+            "count_per_revolution": 4000,
+            "zero_offset": 0,
+            "operation_mode": "PROFILE_POSITION",
+            "profile_velocity": 6.28,
+            "profile_acceleration": 1.57,
+            "profile_deceleration": 1.57
+        },
+        {
+            "name": "j_r4",
+            "vendor_type": "VendorZeroErr", 
+            "node_id": 4,            
+            "count_per_revolution": 4000,
+            "zero_offset": 0,
+            "operation_mode": "PROFILE_POSITION",
+            "profile_velocity": 6.28,
+            "profile_acceleration": 1.57,
+            "profile_deceleration": 1.57
+        }
+    ]
+}
