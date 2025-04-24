@@ -7,8 +7,10 @@ import os
 import json
 import subprocess
 import time
+import canopen
 from std_msgs.msg import String, Float64
 from sensor_msgs.msg import JointState
+from std_srvs.srv import Trigger, TriggerResponse
 
 # 상대 경로를 사용하여 모듈 임포트
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -114,6 +116,9 @@ class CANopenManager:
         # 발행자 설정
         self.joint_state_pub = rospy.Publisher('canopen/joint_states', JointState, queue_size=10)
         
+        # 서비스 등록
+        self.motor_status_service = rospy.Service('canopen/check_motors', Trigger, self.handle_motor_status_check)
+        
         # 구독자 설정
         rospy.Subscriber('canopen/multiple_joints', JointState, self.multiple_joints_callback)
         
@@ -187,8 +192,8 @@ class CANopenManager:
                         node_id = motor_info['node_id']
                         position = msg.position[i]
                         self.motor_controller.set_position(node_id, position)
-                        rospy.loginfo("위치 명령 전송: 관절=%s, 노드ID=%d, 위치=%.2f", 
-                                        joint_name, node_id, position)
+                        # rospy.loginfo("위치 명령 전송: 관절=%s, 노드ID=%d, 위치=%.2f", 
+                        #                 joint_name, node_id, position)
                     else:
                         rospy.logwarn("알 수 없는 관절 이름: %s", joint_name)
         except Exception as e:
@@ -215,6 +220,34 @@ class CANopenManager:
         
         if self.motor_controller:
             try:
+                # 모터 상태 체크
+                all_motors_ok = True
+                if hasattr(self.motor_controller, 'get_all_motors_status'):
+                    all_statuses = self.motor_controller.get_all_motors_status()
+                    
+                    # 각 모터 상태 확인
+                    for node_id, status in all_statuses.items():
+                        # 문제가 있는 모터 찾기
+                        if status.get('error', False) or status.get('disabled', False) or not status.get('active', True):
+                            all_motors_ok = False
+                            
+                            # 모터 이름 찾기
+                            motor_info = next((m for m in self.motors_info if m['node_id'] == node_id), None)
+                            motor_name = motor_info['name'] if motor_info else f"unknown_motor_{node_id}"
+                            
+                            # 문제 원인 파악
+                            error_reasons = []
+                            if status.get('error', False):
+                                error_reasons.append(f"고장 발생(statusword: 0x{status.get('statusword', 0):04X})")
+                            if status.get('disabled', False):
+                                error_reasons.append("비활성화됨")
+                            if not status.get('active', True):
+                                error_reasons.append("동작 중지")
+                                
+                            # 에러 로그 출력
+                            if error_reasons:
+                                rospy.logerr(f"모터 {motor_name}(ID:{node_id}) 문제 발생: {', '.join(error_reasons)}")
+                
                 positions = self.motor_controller.get_positions()
                 velocities = self.motor_controller.get_velocities()
                 torques = self.motor_controller.get_torques()  # 토크 정보 가져오기
@@ -247,7 +280,7 @@ class CANopenManager:
                 joint_state_msg.effort = joint_efforts  # 토크 정보 설정
                 
                 # 상태가 정상인 경우 로그 출력
-                if joint_names:
+                if joint_names and all_motors_ok:
                     rospy.logdebug("CANopen 장치 상태: 정상")
                 
             except Exception as e:
@@ -264,6 +297,17 @@ class CANopenManager:
         메인 실행 루프
         """
         while not rospy.is_shutdown():
+            # 모터 상태 확인
+            if self.motor_controller:
+                try:
+                    # 모터 상태 확인 및 문제 발생 시 모두 비활성화
+                    if hasattr(self.motor_controller, 'check_all_motors_status'):
+                        if not self.motor_controller.check_all_motors_status():
+                            rospy.logerr("모터 에러가 감지되어 모든 모터가 비활성화되었습니다.")
+                except Exception as e:
+                    rospy.logerr("모터 상태 확인 중 오류 발생: %s", str(e))
+                    
+            # 정기적인 상태 발행
             self.publish_status()
             self.rate.sleep()
             
@@ -274,6 +318,91 @@ class CANopenManager:
         if self.motor_controller:
             self.motor_controller.disconnect()
             rospy.loginfo("모터 컨트롤러 연결 해제")
+
+    def get_motor_status(self, req):
+        """
+        CANopen 장치의 상태를 반환하는 서비스 함수
+        """
+        response = TriggerResponse()
+        
+        if not self.motor_controller:
+            response.success = False
+            response.message = "모터 컨트롤러가 초기화되지 않았습니다."
+            return response
+            
+        try:
+            # 모든 모터의 상태 정보 가져오기
+            motor_statuses = {}
+            if hasattr(self.motor_controller, 'get_all_motors_status'):
+                all_statuses = self.motor_controller.get_all_motors_status()
+                
+                # 각 모터 상태 처리
+                for node_id, status in all_statuses.items():
+                    # 모터 이름 찾기
+                    motor_info = next((m for m in self.motors_info if m['node_id'] == node_id), None)
+                    motor_name = motor_info['name'] if motor_info else f"unknown_motor_{node_id}"
+                    
+                    # 상태 정보 가공
+                    motor_statuses[motor_name] = {
+                        'node_id': node_id,
+                        'position': status.get('position', 0),
+                        'velocity': status.get('velocity', 0),
+                        'torque': status.get('torque', 0),
+                        'error': status.get('error', False),
+                        'disabled': status.get('disabled', False),
+                        'active': status.get('active', False),
+                        'warning': status.get('warning', False),
+                        'statusword': f"0x{status.get('statusword', 0):04X}"
+                    }
+            
+            # 모터 에러 여부 확인
+            has_error = any(status.get('error', False) for status in motor_statuses.values())
+            has_disabled = any(status.get('disabled', False) for status in motor_statuses.values())
+            all_active = all(status.get('active', False) for status in motor_statuses.values())
+            
+            # 응답 메시지 생성
+            status_summary = "정상" if all_active and not has_error and not has_disabled else "문제 발생"
+            details = []
+            
+            if has_error:
+                details.append("하나 이상의 모터에 고장이 발생했습니다.")
+            if has_disabled:
+                details.append("하나 이상의 모터가 비활성화되었습니다.")
+            if not all_active:
+                details.append("하나 이상의 모터가 동작 상태가 아닙니다.")
+                
+            response.success = all_active and not has_error and not has_disabled
+            response.message = f"모터 상태: {status_summary}" + (f" - {'; '.join(details)}" if details else "")
+            
+            # 상세 상태 정보도 메시지에 추가
+            status_details = []
+            for name, status in motor_statuses.items():
+                status_text = f"{name}(ID:{status['node_id']}): "
+                if status['error']:
+                    status_text += "고장 발생! "
+                elif status['disabled']:
+                    status_text += "비활성화됨! "
+                elif not status['active']:
+                    status_text += "동작 중지! "
+                else:
+                    status_text += "정상 동작중 "
+                
+                status_text += f"[위치:{status['position']:.2f}, 속도:{status['velocity']:.2f}, 토크:{status['torque']:.2f}]"
+                status_details.append(status_text)
+            
+            response.message += "\n" + "\n".join(status_details)
+            
+            return response
+        except Exception as e:
+            response.success = False
+            response.message = f"모터 상태 확인 중 오류 발생: {str(e)}"
+            return response
+
+    def handle_motor_status_check(self, req):
+        """
+        CANopen 장치의 상태를 반환하는 서비스 함수
+        """
+        return self.get_motor_status(req)
 
 if __name__ == '__main__':
     try:

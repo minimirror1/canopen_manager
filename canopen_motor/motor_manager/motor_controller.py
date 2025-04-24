@@ -225,3 +225,72 @@ class MotorController:
         for node_id, motor in self.motors.items():
             torques[node_id] = motor.get_torque()
         return torques
+        
+    def check_all_motors_status(self):
+        """등록된 모든 모터의 상태를 확인하고 문제가 있으면 처리"""
+        has_error = False
+        error_motor_id = None
+        error_reason = None
+        
+        for node_id, motor in self.motors.items():
+            if hasattr(motor, 'get_status'):
+                status = motor.get_status()
+                
+                # 에러 또는 비활성화 상태 확인
+                if status.get('error', False):
+                    has_error = True
+                    error_motor_id = node_id
+                    error_reason = f"Fault detected (statusword: 0x{status.get('statusword', 0):04X})"
+                    break
+                    
+                if status.get('disabled', False):
+                    has_error = True
+                    error_motor_id = node_id
+                    error_reason = f"Motor disabled (statusword: 0x{status.get('statusword', 0):04X})"
+                    break
+                    
+                if not status.get('active', True):
+                    has_error = True
+                    error_motor_id = node_id
+                    error_reason = f"Operation not enabled (statusword: 0x{status.get('statusword', 0):04X})"
+                    break
+        
+        # 문제가 있으면 모든 모터 비활성화
+        if has_error and error_motor_id is not None:
+            self.disable_all_motors(error_motor_id, error_reason)
+            return False
+            
+        return True
+    
+    def disable_all_motors(self, error_motor_id, error_reason):
+        """문제가 발생한 경우 모든 모터를 비활성화"""
+        print(f"ERROR: 모터 ID {error_motor_id}에서 문제 발생: {error_reason}")
+        print("안전을 위해 모든 모터를 비활성화합니다.")
+        
+        try:
+            # 모든 모터에 빠른 정지(Quick Stop) 명령 보내기
+            for node_id, motor in self.motors.items():
+                try:
+                    if hasattr(motor, 'node') and hasattr(motor.node, 'sdo'):
+                        # 컨트롤워드에 Quick Stop 명령 설정 (0x0002)
+                        motor.node.sdo[0x6040].raw = 0x0002
+                except Exception as e:
+                    print(f"모터 {node_id} 비활성화 중 오류 발생: {str(e)}")
+            
+            # Sync 멈추기
+            self.sync_stop()
+            
+            # NMT 명령으로 모든 노드 정지
+            self.network.nmt.send_command(0x02)  # Stop all nodes
+            
+            print("모든 모터가 비활성화되었습니다.")
+        except Exception as e:
+            print(f"모터 비활성화 중 오류 발생: {str(e)}")
+            
+    def get_all_motors_status(self):
+        """모든 모터의 상태를 반환"""
+        statuses = {}
+        for node_id, motor in self.motors.items():
+            if hasattr(motor, 'get_status'):
+                statuses[node_id] = motor.get_status()
+        return statuses
