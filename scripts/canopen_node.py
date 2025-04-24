@@ -187,8 +187,8 @@ class CANopenManager:
                         node_id = motor_info['node_id']
                         position = msg.position[i]
                         self.motor_controller.set_position(node_id, position)
-                        # rospy.loginfo("위치 명령 전송: 관절=%s, 노드ID=%d, 위치=%.2f", 
-                        #             joint_name, node_id, position)
+                        rospy.loginfo("위치 명령 전송: 관절=%s, 노드ID=%d, 위치=%.2f", 
+                                        joint_name, node_id, position)
                     else:
                         rospy.logwarn("알 수 없는 관절 이름: %s", joint_name)
         except Exception as e:
