@@ -25,6 +25,19 @@ class MotorVendorZeroErr(AbstractMotor):
             
         print(f"[MotorVendorZeroErr] Init motor node: {self.node_id}")
         
+        # 모터 상태 변수 초기화
+        self.motor_status = {
+            'statusword': 0,
+            'ready_to_switch_on': False,
+            'switched_on': False,
+            'operation_enabled': False,
+            'fault': False,
+            'voltage_enabled': False,
+            'quick_stop': False,
+            'switch_on_disabled': False,
+            'warning': False
+        }
+        
         # 모드 설정
         mode_value = self.OPERATION_MODES[self.operation_mode]
         self.node.sdo['Modes of operation'].raw = mode_value
@@ -38,7 +51,18 @@ class MotorVendorZeroErr(AbstractMotor):
 
         self.plusToRad = 2 * pi / self.PULSE_PER_REVOLUTION
         
-        
+    def try_auto_reset(self):
+        """모터 에러 발생 시 자동 리셋을 시도하는 함수"""
+        if self.motor_status.get('fault', False):
+            print(f"[MotorVendorZeroErr] Attempting to auto-reset motor {self.node_id} after fault")
+            self.reset()
+            return True
+        return False
+    
+    def get_motor_status(self):
+        """모터 상태 반환"""
+        return self.motor_status
+
     def _convert_rad_to_pulse(self, rad_value):
         """라디안 값을 펄스 카운트로 변환"""
         return int((rad_value * self.PULSE_PER_REVOLUTION) / (2 * pi))
@@ -234,9 +258,60 @@ class MotorVendorZeroErr(AbstractMotor):
         return self.current_acceleration
 
     def tpdo1_callback(self, message):
-        #position = message.data[2] | (message.data[3] << 8) | (message.data[4] << 16) | (message.data[5] << 24)
-        #if position & 0x80000000:  # 최상위 비트가 1이면 음수
-        #    position = -((~position + 1) & 0xFFFFFFFF)  # 2의 보수 처리
+        # Statusword 읽기 (message.data의 첫 2바이트)
+        statusword = int.from_bytes(message.data[0:2], byteorder='little')
+        
+        # 이전 상태와 현재 상태 비교를 위해 이전 상태 저장
+        previous_status = self.motor_status.copy() if hasattr(self, 'motor_status') else None
+        
+        # Statusword 비트 해석
+        is_ready_to_switch_on = bool(statusword & (1 << 0))  # Bit 0
+        is_switched_on = bool(statusword & (1 << 1))        # Bit 1
+        is_operation_enabled = bool(statusword & (1 << 2))  # Bit 2
+        is_fault = bool(statusword & (1 << 3))              # Bit 3
+        is_voltage_enabled = bool(statusword & (1 << 4))    # Bit 4
+        is_quick_stop = bool(statusword & (1 << 5))         # Bit 5
+        is_switch_on_disabled = bool(statusword & (1 << 6)) # Bit 6
+        is_warning = bool(statusword & (1 << 7))            # Bit 7
+        
+        # 모터 상태 저장
+        self.motor_status = {
+            'statusword': statusword,
+            'ready_to_switch_on': is_ready_to_switch_on,
+            'switched_on': is_switched_on,
+            'operation_enabled': is_operation_enabled,
+            'fault': is_fault,
+            'voltage_enabled': is_voltage_enabled,
+            'quick_stop': is_quick_stop,
+            'switch_on_disabled': is_switch_on_disabled,
+            'warning': is_warning
+        }
+        
+        # 모터 상태 감지 및 표시 (새로운 상태 변화가 있을 때만 출력)
+        if previous_status is None or previous_status['fault'] != is_fault:
+            if is_fault:
+                print(f"[MotorVendorZeroErr] ERROR: Motor {self.node_id} Fault detected! Statusword: 0x{statusword:04X}")
+                # 에러 발생 시 자동 리셋 시도
+                self.try_auto_reset()
+        
+        if previous_status is None or previous_status['switch_on_disabled'] != is_switch_on_disabled:
+            if is_switch_on_disabled:
+                print(f"[MotorVendorZeroErr] WARNING: Motor {self.node_id} Switch ON disabled! Statusword: 0x{statusword:04X}")
+                # 비활성화 상태인 경우 활성화 시도
+                self.set_switchOn()
+        
+        if previous_status is None or previous_status['operation_enabled'] != is_operation_enabled:
+            if not is_operation_enabled:
+                print(f"[MotorVendorZeroErr] WARNING: Motor {self.node_id} Operation not enabled! Statusword: 0x{statusword:04X}")
+                # 운영 모드가 비활성화된 경우 활성화 시도
+                if not is_fault and not is_quick_stop:  # 에러나 빠른 정지 상태가 아닌 경우에만 시도
+                    self.set_switchOn()
+        
+        if previous_status is None or previous_status['warning'] != is_warning:
+            if is_warning:
+                print(f"[MotorVendorZeroErr] WARNING: Motor {self.node_id} Warning bit set! Statusword: 0x{statusword:04X}")
+
+        # 원래 위치 값 읽기 처리
         position = int.from_bytes(message.data[2:5], byteorder='little', signed=True)
         self.current_position = (position - self.zero_offset) * self.plusToRad  # rad로 변환
         #print(f'TPDO1 Position actual value: {self.current_position}')
@@ -275,3 +350,34 @@ class MotorVendorZeroErr(AbstractMotor):
     def set_acceleration(self, value):
         """모터 가속도 명령"""
         print(f"[MotorVendorZeroErr] Set acceleration to {value}, node: {self.node_id}")
+
+    def get_status(self):
+        """모터의 전체 상태 정보를 반환하는 함수"""
+        status = {
+            'node_id': self.node_id,
+            'name': self.name,
+            'position': self.current_position if hasattr(self, 'current_position') else 0,
+            'torque': self.current_torque_sensor if hasattr(self, 'current_torque_sensor') else 0,
+            'velocity': self.velocity_actual_value if hasattr(self, 'velocity_actual_value') else 0
+        }
+        
+        # 모터 상태 정보 추가
+        if hasattr(self, 'motor_status'):
+            status.update({
+                'error': self.motor_status.get('fault', False),
+                'disabled': self.motor_status.get('switch_on_disabled', False),
+                'active': self.motor_status.get('operation_enabled', False),
+                'statusword': self.motor_status.get('statusword', 0),
+                'warning': self.motor_status.get('warning', False),
+                'ready': self.motor_status.get('ready_to_switch_on', False)
+            })
+        
+        return status
+
+# 다음 개선 사항:
+# 1. MotorVendorElmo 클래스에도 동일한 Status word 감시 기능 구현 필요
+# 2. 구현 방법:
+#    - motor_status 변수 초기화를 init()에 추가
+#    - tpdo1_callback에서 Status word 비트 해석 코드 추가
+#    - try_auto_reset(), get_motor_status(), get_status() 메소드 추가
+#    - 에러 및 비활성화 시 자동 복구 로직 구현
