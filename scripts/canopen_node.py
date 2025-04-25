@@ -64,7 +64,7 @@ def setup_can_interface(interface, bitrate=1000000, txqueuelen=1000):
         return True
     
     # CANable2 설정 (slcan 사용)
-    success, output = run_command("slcand -o -s8 /dev/ttyACM0 can0")
+    success, output = run_command("slcand -o -s8 /dev/canable can0")
     if not success:
         rospy.logwarn("slcand 실행 실패: %s", output)
         rospy.loginfo("이미 실행 중이거나 장치에 문제가 있을 수 있습니다.")
@@ -103,6 +103,12 @@ class CANopenManager:
         self.heartbeat_interval = rospy.get_param('~heartbeat_interval', 1000)  # ms
         self.can_bitrate = rospy.get_param('~can_bitrate', 1000000)  # 1Mbps
         self.can_txqueuelen = rospy.get_param('~can_txqueuelen', 1000)
+        
+        # 모터 상태 캐싱 변수
+        self.motors_status_ok = True  # 모든 모터가 정상 상태인지 여부
+        self.motors_status_cache = {}  # 모터 상태 캐시
+        self.last_status_check_time = rospy.Time.now()
+        self.status_check_interval = rospy.Duration(0.5)  # 0.5초마다 상태 확인
         
         # CAN 인터페이스 설정
         if setup_can_interface(self.can_interface, self.can_bitrate, self.can_txqueuelen):
@@ -181,6 +187,17 @@ class CANopenManager:
         if not self.motor_controller:
             rospy.logwarn("모터 컨트롤러가 초기화되지 않았습니다.")
             return
+            
+        # 캐싱된 모터 상태를 확인
+        if not self.motors_status_ok:
+            # 문제가 있는 모터 정보 찾아서 로그 출력
+            for node_id, status in self.motors_status_cache.items():
+                if status.get('error', False) or status.get('disabled', False) or not status.get('active', True):
+                    motor_info = next((m for m in self.motors_info if m['node_id'] == node_id), None)
+                    motor_name = motor_info['name'] if motor_info else f"unknown_motor_{node_id}"
+                    rospy.logerr(f"모터 {motor_name}(ID:{node_id})에 문제가 발생하여 모든 위치 명령을 무시합니다. 상태워드: 0x{status.get('statusword', 0):04X}")
+                    break
+            return  # 명령 전달 중단
 
         try:
             # JointState 메시지의 각 관절에 대해 위치 명령을 처리
@@ -203,12 +220,30 @@ class CANopenManager:
         """
         단일 모터의 위치를 제어하는 콜백 함수
         """
-        if self.motor_controller:
-            try:
-                self.motor_controller.set_position(node_id, msg.data)
-                #rospy.loginfo("위치 명령 전송: 노드ID=%d, 위치=%.2f", node_id, msg.data)
-            except Exception as e:
-                rospy.logerr("위치 명령 전송 실패: %s", str(e))
+        if not self.motor_controller:
+            rospy.logwarn("모터 컨트롤러가 초기화되지 않았습니다.")
+            return
+            
+        # 캐싱된 모터 상태를 확인
+        if not self.motors_status_ok:
+            # 현재 명령을 받는 모터 이름 찾기
+            target_motor_info = next((m for m in self.motors_info if m['node_id'] == node_id), None)
+            target_motor_name = target_motor_info['name'] if target_motor_info else f"unknown_motor_{node_id}"
+            
+            # 문제가 있는 모터 정보 찾아서 로그 출력
+            for motor_id, status in self.motors_status_cache.items():
+                if status.get('error', False) or status.get('disabled', False) or not status.get('active', True):
+                    motor_info = next((m for m in self.motors_info if m['node_id'] == motor_id), None)
+                    motor_name = motor_info['name'] if motor_info else f"unknown_motor_{motor_id}"
+                    rospy.logerr(f"모터 {motor_name}(ID:{motor_id})에 문제가 발생하여 {target_motor_name}(ID:{node_id})에 대한 위치 명령을 무시합니다.")
+                    break
+            return  # 명령 전달 중단
+        
+        try:
+            self.motor_controller.set_position(node_id, msg.data)
+            #rospy.loginfo("위치 명령 전송: 노드ID=%d, 위치=%.2f", node_id, msg.data)
+        except Exception as e:
+            rospy.logerr("위치 명령 전송 실패: %s", str(e))
         
     def publish_status(self):
         """
@@ -297,16 +332,36 @@ class CANopenManager:
         메인 실행 루프
         """
         while not rospy.is_shutdown():
-            # 모터 상태 확인
-            if self.motor_controller:
-                try:
-                    # 모터 상태 확인 및 문제 발생 시 모두 비활성화
-                    if hasattr(self.motor_controller, 'check_all_motors_status'):
-                        if not self.motor_controller.check_all_motors_status():
-                            rospy.logerr("모터 에러가 감지되어 모든 모터가 비활성화되었습니다.")
-                except Exception as e:
-                    rospy.logerr("모터 상태 확인 중 오류 발생: %s", str(e))
-                    
+            current_time = rospy.Time.now()
+            
+            # 주기적으로 모터 상태 확인 (0.5초마다)
+            if current_time - self.last_status_check_time >= self.status_check_interval:
+                self.last_status_check_time = current_time
+                
+                # 모터 상태 확인 및 캐싱
+                if self.motor_controller and hasattr(self.motor_controller, 'get_all_motors_status'):
+                    try:
+                        all_statuses = self.motor_controller.get_all_motors_status()
+                        self.motors_status_cache = all_statuses
+                        
+                        # 모터 상태 확인
+                        self.motors_status_ok = True
+                        for node_id, status in all_statuses.items():
+                            if status.get('error', False) or status.get('disabled', False) or not status.get('active', True):
+                                self.motors_status_ok = False
+                                
+                                # 문제있는 모터 정보 로깅
+                                motor_info = next((m for m in self.motors_info if m['node_id'] == node_id), None)
+                                motor_name = motor_info['name'] if motor_info else f"unknown_motor_{node_id}"
+                                rospy.logerr(f"모터 {motor_name}(ID:{node_id})에 문제가 발생했습니다. 모든 명령이 무시됩니다. 상태워드: 0x{status.get('statusword', 0):04X}")
+                                break
+                        
+                        # 모터 상태 확인 및 문제 발생 시 모두 비활성화 (disable_all_motors 호출 제거)
+                        # 메시지 처리가 이미 차단되므로 추가 비활성화는 필요 없음
+                    except Exception as e:
+                        rospy.logerr("모터 상태 확인 중 오류 발생: %s", str(e))
+                        self.motors_status_ok = False  # 에러 발생 시 안전하게 False로 설정
+            
             # 정기적인 상태 발행
             self.publish_status()
             self.rate.sleep()

@@ -28,18 +28,24 @@ class MotorVendorElmo(AbstractMotor):
 
         print(f"count_per_revolution: {self.count_per_revolution}")
         # b
-        self.node.sdo['following_error_window'].raw = self.count_per_revolution * 5
+        # self.node.sdo['following_error_window'].raw = self.count_per_revolution * 5
+        # time.sleep(0.1)
+        # self.node.sdo['max_profile_velocity'].raw = self._convert_rad_to_pulse(self.profile_velocity)
+        # time.sleep(0.1)
+        # self.node.sdo['profile_velocity'].raw = self._convert_rad_to_pulse(self.profile_velocity)
+        # time.sleep(0.1)
+        # self.node.sdo['profile_acceleration'].raw = self._convert_rad_to_pulse(self.profile_acceleration)
+        # time.sleep(0.1)
+        # self.node.sdo['profile_deceleration'].raw = self._convert_rad_to_pulse(self.profile_deceleration)
+        # time.sleep(0.1)
+        self.node.sdo['profile_velocity'].raw = 260000
         time.sleep(0.1)
-        self.node.sdo['max_profile_velocity'].raw = self._convert_rad_to_pulse(self.profile_velocity)
+        self.node.sdo['profile_acceleration'].raw = 320000
         time.sleep(0.1)
-        self.node.sdo['profile_velocity'].raw = self._convert_rad_to_pulse(self.profile_velocity)
+        self.node.sdo['profile_deceleration'].raw = 160000
         time.sleep(0.1)
-        self.node.sdo['profile_acceleration'].raw = self._convert_rad_to_pulse(self.profile_acceleration)
-        time.sleep(0.1)
-        self.node.sdo['profile_deceleration'].raw = self._convert_rad_to_pulse(self.profile_deceleration)
-        time.sleep(0.1)
-        self.node.sdo['quick_stop_deceleration'].raw = self._convert_rad_to_pulse(self.profile_deceleration)
-        time.sleep(0.1)
+        # self.node.sdo['quick_stop_deceleration'].raw = self._convert_rad_to_pulse(self.profile_deceleration)
+        # time.sleep(0.1)
         self.node.sdo['motion_profile_type'].raw = 0
         time.sleep(0.1)
 
@@ -165,8 +171,10 @@ class MotorVendorElmo(AbstractMotor):
         # self.node.rpdo[1]['controlword'].raw = 0x0f
         # self.node.rpdo[1].transmit()
 
-        position_pulse = self._convert_rad_to_pulse(value) + self.zero_offset   
-        self.node.sdo['target_position'].raw = position_pulse
+        # position_pulse = self._convert_rad_to_pulse(value) + self.zero_offset   
+        # self.node.sdo['target_position'].raw = position_pulse
+
+        self.node.sdo['target_position'].raw = value
         self.node.sdo['controlword'].raw = 0x3F # Start
         time.sleep(0.001)
 
@@ -183,7 +191,9 @@ class MotorVendorElmo(AbstractMotor):
         self.node.rpdo[2].transmit()
 
     def get_torque(self):
-        return self.current_torque
+        # TODO: 실제 토크 값을 구현해야 함
+        # self.current_torque_sensor 사용하거나 적절한 토크 측정 메커니즘 구현 필요
+        return 0  # 임시로 0 반환
 
     def pdo_callback_register(self):
         self.network.subscribe(self.node.tpdo[1].cob_id, self.node.tpdo[1].on_message)
@@ -197,7 +207,8 @@ class MotorVendorElmo(AbstractMotor):
         self.current_position = (position - self.zero_offset) * self.plusToRad
 
     def tpdo2_callback(self, message):
-        self.current_torque = int.from_bytes(message.data[0:2], byteorder='little', signed=True)
+        # TODO: 나중에 current_torque_sensor로 수정 필요
+        # self.current_torque_sensor = int.from_bytes(message.data[0:2], byteorder='little', signed=True)
         velocity_pulse = int.from_bytes(message.data[2:6], byteorder='little', signed=True)
         self.velocity_actual_value = velocity_pulse * self.plusToRad
         
@@ -249,4 +260,27 @@ class MotorVendorElmo(AbstractMotor):
         if hasattr(self, 'logging') and self.logging:
             self.logging = False
             self.log_file.close()
+
+    def get_status(self):
+        """모터의 상태 정보를 반환하는 함수"""
+        # TODO: 나중에 제대로 구현 필요
+        # 각 모터 상태 정보를 포함한 딕셔너리 반환
+        return {
+            'node_id': self.node_id,
+            'name': self.name,
+            'position': self.current_position if hasattr(self, 'current_position') else 0,
+            'torque': 0,  # 임시로 0 반환
+            'velocity': self.velocity_actual_value if hasattr(self, 'velocity_actual_value') else 0,
+            'error': False,
+            'disabled': False,
+            'active': True,
+            'statusword': 0,
+            'warning': False,
+            'ready': True
+        }
+
+    def set_dt(self, value = 0.01):
+        """dt 값을 설정"""
+        # TODO: 나중에 필요에 따라 관련 로직 추가
+        self.dt = value
  
