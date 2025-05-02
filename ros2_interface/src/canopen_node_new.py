@@ -13,7 +13,7 @@ import traceback
 from std_msgs.msg import String, Float64
 from sensor_msgs.msg import JointState
 from std_srvs.srv import Trigger
-
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
 # common_canopen 패키지 경로를 시스템 경로에 추가
 # 여러 경로를 시도하여 모듈을 찾음
 def find_common_canopen():
@@ -195,12 +195,19 @@ class CANopenManager(Node):
         # 서비스 등록
         self.motor_status_service = self.create_service(Trigger, 'canopen/check_motors', self.handle_motor_status_check)
         
+        QOS_BEKL5V = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            durability=QoSDurabilityPolicy.VOLATILE,
+            depth=5
+        )
+
         # 구독자 설정
         self.multiple_joints_sub = self.create_subscription(
             JointState, 
-            'canopen/multiple_joints', 
+            'joint_state', 
             self.multiple_joints_callback, 
-            10
+            QOS_BEKL5V
         )
         
         # 모터 컨트롤러 초기화
@@ -264,8 +271,9 @@ class CANopenManager(Node):
     
     def multiple_joints_callback(self, msg):
         """여러 관절의 위치를 동시에 제어하는 콜백 함수"""
+        self.get_logger().warning("test")
         if not self.motor_controller:
-            self.get_logger().warn("모터 컨트롤러가 초기화되지 않았습니다.")
+            self.get_logger().warning("모터 컨트롤러가 초기화되지 않았습니다.")
             return
             
         # 캐싱된 모터 상태를 확인
@@ -275,7 +283,7 @@ class CANopenManager(Node):
                 if status.get('error', False) or status.get('disabled', False) or not status.get('active', True):
                     motor_info = next((m for m in self.motors_info if m['node_id'] == node_id), None)
                     motor_name = motor_info['name'] if motor_info else f"unknown_motor_{node_id}"
-                    self.get_logger().error(f"모터 {motor_name}(ID:{node_id})에 문제가 발생하여 모든 위치 명령을 무시합니다. 상태워드: 0x{status.get('statusword', 0):04X}")
+                    self.get_logger().warning(f"모터 {motor_name}(ID:{node_id})에 문제가 발생하여 모든 위치 명령을 무시합니다. 상태워드: 0x{status.get('statusword', 0):04X}")
                     break
             return  # 명령 전달 중단
         
@@ -289,9 +297,9 @@ class CANopenManager(Node):
                 
                 # 위치 명령 전송
                 try:
-                    self.motor_controller.set_target_position(node_id, position)
+                    self.motor_controller.set_position(node_id, position)
                 except Exception as e:
-                    self.get_logger().error(f"모터 {joint_name}(ID:{node_id})에 위치 명령 전송 실패: {str(e)}")
+                    self.get_logger().warning(f"모터 {joint_name}(ID:{node_id})에 위치 명령 전송 실패: {str(e)}")
     
     def single_motor_position_callback(self, msg, node_id):
         """단일 모터에 위치 명령을 전송하는 콜백 함수"""
@@ -309,7 +317,7 @@ class CANopenManager(Node):
         
         # 위치 명령 전송
         try:
-            self.motor_controller.set_target_position(node_id, msg.data)
+            self.motor_controller.set_position(node_id, msg.data)
             motor_info = next((m for m in self.motors_info if m['node_id'] == node_id), None)
             if motor_info:
                 self.get_logger().info(f"모터 {motor_info['name']}(ID:{node_id})에 위치 명령 전송: {msg.data}")
@@ -375,7 +383,7 @@ class CANopenManager(Node):
                         joint_state.velocity.append(velocity)
                         joint_state.effort.append(torque)  # 토크 정보 추가
 
-                        #elf.get_logger().warning(f"모터 {motor_name}(ID:{node_id}) 위치: {position}, 속도: {velocity}, 토크: {torque}")
+                        #self.get_logger().warning(f"모터 {motor_name}(ID:{node_id}) 위치: {position}, 속도: {velocity}, 토크: {torque}")
                     else:
                         self.get_logger().warning(f"모터 ID:{node_id} 정보를 찾을 수 없음")
             except Exception as e:
@@ -384,7 +392,7 @@ class CANopenManager(Node):
             # 메시지 발행
             if joint_state.name:
                 self.joint_state_pub.publish(joint_state)
-                self.get_logger().warning(f"토픽 발행 - joint_states: {len(joint_state.name)}개 모터 정보")
+                # self.get_logger().warning(f"토픽 발행 - joint_states: {len(joint_state.name)}개 모터 정보")
         except Exception as e:
             self.get_logger().error(f"상태 발행 중 오류 발생: {str(e)}")
     
