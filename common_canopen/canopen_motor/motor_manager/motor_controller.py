@@ -294,3 +294,14 @@ class MotorController:
             if hasattr(motor, 'get_status'):
                 statuses[node_id] = motor.get_status()
         return statuses
+
+    def get_motor_status(self, node_id):
+        if node_id in self.motors:
+            if hasattr(self.motors[node_id], 'get_motor_status'):
+                return self.motors[node_id].get_motor_status()
+            else:
+                # 가능한 기본 상태 값 반환
+                return {'active': True, 'error': False, 'disabled': False, 'statusword': 0}
+        else:
+            print(f"Node {node_id} not found in motors dictionary.")
+            return None

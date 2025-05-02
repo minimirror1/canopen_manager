@@ -1,0 +1,1 @@
+"""Common CANopen package shared between ROS1 and ROS2""" 

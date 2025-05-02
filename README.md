@@ -1,134 +1,85 @@
 # CANopen Manager
 
-CANopen 프로토콜을 관리하는 ROS 패키지입니다.
+CANopen 프로토콜을 사용하여 모터를 제어하는 ROS1/ROS2 공용 패키지입니다.
 
-## 설치 방법
+## 폴더 구조
 
-```bash
-# ROS 작업 공간으로 이동
-cd ~/catkin_ws
-
-# 소스 코드 복제
-git clone https://github.com/your_username/canopen_manager.git src/canopen_manager
-
-# 의존성 설치
-sudo apt-get install python-pip
-pip install canopen
-
-# 빌드
-catkin_make
-
-# 환경 설정
-source devel/setup.bash
+```
+canopen_shared_repo/
+├── common_canopen/         # 공통 CANopen 로직 구현 (ROS 의존 없음)
+│   ├── canopen_motor/      # 모터 관련 로직
+│   │   ├── motor_manager/  # 모터 관리 클래스
+│   │   ├── motor_vendors/  # 제조사별 모터 구현
+│   │   └── config/         # 설정 파일
+│   ├── canopen_info_json/  # CANopen 설정 JSON 파일
+│   ├── include/            # 헤더 파일(필요시)
+│   └── src/                # 소스 파일(필요시)
+├── ros1_interface/         # ROS1 인터페이스
+│   ├── src/                # ROS1 노드 구현
+│   │   ├── canopen_node.py
+│   │   ├── send_command.py
+│   │   └── motor_setting_node.py
+│   ├── launch/             # ROS1 launch 파일
+│   └── msg/                # ROS1 메시지 정의(필요시)
+├── ros2_interface/         # ROS2 인터페이스
+│   ├── src/                # ROS2 노드 구현
+│   │   ├── canopen_node.py
+│   │   └── send_command.py
+│   ├── launch/             # ROS2 launch 파일
+│   └── msg/                # ROS2 메시지 정의(필요시)
 ```
 
 ## 사용 방법
 
-### CAN 인터페이스 설정
-
-이 패키지는 CAN 인터페이스를 자동으로 설정하려고 시도합니다. 하지만 CAN 인터페이스 설정에는 root 권한이 필요합니다. 다음 두 가지 방법 중 하나를 선택할 수 있습니다:
-
-1. 노드를 실행하기 전에 수동으로 CAN 인터페이스 설정 (CANable 사용):
-   ```bash
-   sudo slcand -o -s8 -t hw -S 1000000 /dev/ttyACM0 can0
-   sudo ip link set can0 up
-   sudo ip link set can0 txqueuelen 1000
-   ```
-
-2. 노드를 root 권한으로 실행:
-   ```bash
-   sudo roslaunch canopen_manager canopen_manager.launch
-   ```
-
-### 노드 실행
+### ROS1에서 사용
 
 ```bash
-# launch 파일을 사용하여 노드 실행
-roslaunch canopen_manager canopen_manager.launch
+# ROS1 워크스페이스에서 빌드
+cd ~/catkin_ws/src
+git clone [REPO_URL]
+cd ..
+catkin_make
+
+# 노드 실행
+roslaunch ros1_interface canopen_manager.launch
+
+# 모터에 위치 명령 전송
+rosrun ros1_interface send_command.py position 1.57 [모터이름]
+
+# 명령 전송
+rosrun ros1_interface send_command.py command [명령]
 ```
 
-### 파라미터
-
-launch 파일에서 다음 파라미터를 설정할 수 있습니다:
-
-- `can_interface`: CAN 인터페이스 이름 (기본값: "can0")
-- `node_id`: CANopen 노드 ID (기본값: 1)
-- `heartbeat_interval`: 하트비트 간격 (ms) (기본값: 1000)
-
-### 토픽
-
-#### 발행 토픽
-
-- `/canopen/joint_states` (sensor_msgs/JointState)
-  - 모든 모터의 현재 상태 정보를 발행
-  - name: 모터 이름 배열
-  - position: 현재 위치 배열 (라디안)
-  - velocity: 속도 배열 (rad/s)
-  - effort: 토크 배열 (N⋅m, 뉴턴미터)
-
-#### 구독 토픽
-
-- `/canopen/multiple_joints` (sensor_msgs/JointState)
-  - 여러 모터의 위치를 동시에 제어
-  - name: 제어할 모터 이름 배열
-  - position: 목표 위치 배열 (라디안)
-
-- `/canopen/single_motor/{motor_name}/position` (std_msgs/Float64)
-  - 특정 모터의 위치를 개별적으로 제어
-  - data: 목표 위치 (라디안)
-  - {motor_name}은 JSON 설정 파일에 정의된 모터 이름으로 대체
-
-### 명령 보내기
+### ROS2에서 사용
 
 ```bash
-# 일반 명령 보내기
-rosrun canopen_manager send_command.py command reset
-rosrun canopen_manager send_command.py command init
+# ROS2 워크스페이스에서 빌드
+cd ~/ros2_ws/src
+git clone [REPO_URL]
+cd ..
+colcon build --packages-select common_canopen ros2_interface
 
-# 특정 모터에 위치 명령 보내기 (라디안)
-rosrun canopen_manager send_command.py position 1.57 j_l1
+# 노드 실행
+ros2 launch ros2_interface canopen_manager.launch.py
+
+# 모터에 위치 명령 전송
+ros2 run ros2_interface send_command.py position 1.57 [모터이름]
+
+# 명령 전송
+ros2 run ros2_interface send_command.py command [명령]
 ```
 
-### 모터 관리 기능
+## 의존성
 
-이 패키지는 `canopen_motor` 모듈을 통해 다양한 제조사의 CANopen 모터를 관리할 수 있습니다.
-
-#### 모터 설정 방법
-
-모터 설정은 `canopen_info_json/canopen_info.json` 파일에서 관리됩니다. 이 파일의 형식은 다음과 같습니다:
-
-```json
-{
-    "motors": [
-        {
-            "name": "j_l1",
-            "vendor_type": "VendorZeroErr", 
-            "node_id": 11,            
-            "zero_offset": 84303,
-            "operation_mode": "PROFILE_POSITION",
-            "profile_velocity": 1.0,
-            "profile_acceleration": 1.0,
-            "profile_deceleration": 1.0
-        }
-    ]
-}
-```
-
-각 모터에 대해 다음 파라미터를 설정할 수 있습니다:
-- `name`: 모터 이름 (필수)
-- `vendor_type`: 제조사 타입 (필수, 예: "VendorZeroErr")
-- `node_id`: CAN 노드 ID (필수)
-- `operation_mode`: 동작 모드 (필수, 예: "PROFILE_POSITION")
-- `zero_offset`: 영점 오프셋 (선택 사항)
-- `profile_velocity`: 프로파일 속도 (rad/s) (선택 사항)
-- `profile_acceleration`: 프로파일 가속도 (rad/s²) (선택 사항)
-- `profile_deceleration`: 프로파일 감속도 (rad/s²) (선택 사항)
-
-#### 지원하는 모터 제조사
-
-- VendorZeroErr: ZeroErr 모터 드라이버
-- VendorElmo: Elmo 모터 드라이버
+- Python 3.6 이상
+- python-canopen-pip (pip3 install canopen)
+- ROS1 또는 ROS2
+- PySide6 (GUI를 위한 의존성, 선택적)
 
 ## 라이선스
 
-BSD 라이선스 
+BSD 라이선스
+
+## 저자
+
+[저자 이름] <email@example.com> 

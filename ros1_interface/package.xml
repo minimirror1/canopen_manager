@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>ros1_interface</name>
+  <version>0.1.0</version>
+  <description>CANopen ROS1 인터페이스 - ROS1에서 CANopen 라이브러리를 사용하는 인터페이스</description>
+
+  <maintainer email="user@example.com">ROS User</maintainer>
+  <license>BSD</license>
+  <url type="website">http://wiki.ros.org/ros1_interface</url>
+  <author email="user@example.com">ROS User</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>rospy</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>std_srvs</build_depend>
+  
+  <build_export_depend>rospy</build_export_depend>
+  <build_export_depend>std_msgs</build_export_depend>
+  <build_export_depend>sensor_msgs</build_export_depend>
+  <build_export_depend>std_srvs</build_export_depend>
+  
+  <exec_depend>rospy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_srvs</exec_depend>
+  <exec_depend>rospkg</exec_depend>
+  <exec_depend>python-canopen</exec_depend>
+
+  <export>
+  </export>
+</package> 

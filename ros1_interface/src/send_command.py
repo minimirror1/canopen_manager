@@ -6,13 +6,15 @@ import os
 import json
 from std_msgs.msg import String, Float64
 import sys
+import rospkg
 
 def load_motors_info():
     """JSON 파일에서 모터 정보를 로드합니다."""
     try:
-        # 패키지 경로 가져오기
-        package_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        json_path = os.path.join(package_path, 'canopen_info_json', 'canopen_info.json')
+        # common_canopen 패키지 경로 사용
+        rospack = rospkg.RosPack()
+        common_canopen_path = rospack.get_path('common_canopen')
+        json_path = os.path.join(common_canopen_path, 'canopen_info_json', 'canopen_info.json')
         
         with open(json_path, 'r') as f:
             data = json.load(f)
