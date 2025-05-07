@@ -292,20 +292,20 @@ class MotorVendorZeroErr(AbstractMotor):
             if is_fault:
                 print(f"[MotorVendorZeroErr] ERROR: Motor {self.node_id} Fault detected! Statusword: 0x{statusword:04X}")
                 # 에러 발생 시 자동 리셋 시도
-                self.try_auto_reset()
+                #self.try_auto_reset()
         
         if previous_status is None or previous_status['switch_on_disabled'] != is_switch_on_disabled:
             if is_switch_on_disabled:
                 print(f"[MotorVendorZeroErr] WARNING: Motor {self.node_id} Switch ON disabled! Statusword: 0x{statusword:04X}")
                 # 비활성화 상태인 경우 활성화 시도
-                self.set_switchOn()
+                #self.set_switchOn()
         
         if previous_status is None or previous_status['operation_enabled'] != is_operation_enabled:
             if not is_operation_enabled:
                 print(f"[MotorVendorZeroErr] WARNING: Motor {self.node_id} Operation not enabled! Statusword: 0x{statusword:04X}")
                 # 운영 모드가 비활성화된 경우 활성화 시도
-                if not is_fault and not is_quick_stop:  # 에러나 빠른 정지 상태가 아닌 경우에만 시도
-                    self.set_switchOn()
+                #if not is_fault and not is_quick_stop:  # 에러나 빠른 정지 상태가 아닌 경우에만 시도
+                    #self.set_switchOn()
         
         if previous_status is None or previous_status['warning'] != is_warning:
             if is_warning:
