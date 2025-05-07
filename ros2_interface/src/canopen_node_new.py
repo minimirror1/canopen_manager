@@ -460,7 +460,7 @@ def main(args=None):
         if hasattr(node, 'motor_controller') and node.motor_controller:
             try:
                 # 모든 모터 비활성화
-                node.motor_controller.all_motors_disable()
+                node.motor_controller.disable_all_motors(error_motor_id=None, error_reason="keyboard interrupt")
                 node.get_logger().info("모든 모터가 비활성화되었습니다.")
             except Exception as e:
                 node.get_logger().error(f"모터 비활성화 중 오류 발생: {str(e)}")

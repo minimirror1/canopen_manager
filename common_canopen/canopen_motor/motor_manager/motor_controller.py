@@ -75,15 +75,19 @@ class MotorController:
             motor.init()
 
     def reset_all(self):
+        
+        self.network.nmt.send_command(0x02)  # Stop
+        time.sleep(0.5)
+        self.network.nmt.send_command(0x82)  # Reset communication
+        time.sleep(1)  # 재설정 후 충분한 대기 시간
+        #self.network.nmt.send_command(0x80)  # Reset node
+        print("Reset all motors")
+    
         """등록된 모든 모터를 리셋"""
         for node_id, motor in self.motors.items():
             motor.reset()            
 
-        self.network.nmt.send_command(0x02)  # Stop
-        time.sleep(0.5)
-        self.network.nmt.send_command(0x82)  # Reset
-        time.sleep(1)  # 재설정 후 충분한 대기 시간
-        
+
         # NMT 상태 확인
         try:
             self.network.nmt.send_command(0x01)  # Start
