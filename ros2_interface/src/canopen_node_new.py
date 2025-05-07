@@ -271,7 +271,7 @@ class CANopenManager(Node):
     
     def multiple_joints_callback(self, msg):
         """여러 관절의 위치를 동시에 제어하는 콜백 함수"""
-        self.get_logger().warning("test")
+
         if not self.motor_controller:
             self.get_logger().warning("모터 컨트롤러가 초기화되지 않았습니다.")
             return
