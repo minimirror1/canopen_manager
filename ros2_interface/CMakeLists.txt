@@ -39,6 +39,14 @@ install(DIRECTORY
 install(DIRECTORY
   ${CMAKE_CURRENT_SOURCE_DIR}/../common_canopen
   DESTINATION share/${PROJECT_NAME}
+  PATTERN "*"
+)
+
+# 모든 EDS 파일 설치를 위한 설정
+file(GLOB EDS_FILES "${CMAKE_CURRENT_SOURCE_DIR}/../common_canopen/canopen_motor/config/*.eds")
+install(FILES
+  ${EDS_FILES}
+  DESTINATION share/${PROJECT_NAME}/common_canopen/config
 )
 
 ament_package() 
