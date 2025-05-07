@@ -59,9 +59,7 @@ class MotorVendorZeroErr(AbstractMotor):
             return True
         return False
     
-    def get_motor_status(self):
-        """모터 상태 반환"""
-        return self.motor_status
+
 
     def _convert_rad_to_pulse(self, rad_value):
         """라디안 값을 펄스 카운트로 변환"""
@@ -178,6 +176,99 @@ class MotorVendorZeroErr(AbstractMotor):
         self.node.nmt.state = 'OPERATIONAL'
         pass
 
+
+    def pdo_callback_register(self):
+        self.network.subscribe(self.node.tpdo[1].cob_id, self.node.tpdo[1].on_message)
+        self.node.tpdo[1].add_callback(self.tpdo1_callback)
+
+        self.network.subscribe(self.node.tpdo[2].cob_id, self.node.tpdo[2].on_message)
+        self.node.tpdo[2].add_callback(self.tpdo2_callback)
+
+    def get_motor_status(self):
+        """모터 상태 반환"""
+        return self.motor_status
+        
+    def get_position(self):        
+        # self.current_position = self.node.sdo['Position actual value'].raw
+        # print(f"[MotorVendorZeroErr] Get position, node: {self.node_id}, position: {self.current_position}")
+        return self.current_position
+    
+ 
+
+    def get_torque(self):        
+        # CANopen 노드에서 토크 값을 읽어옴
+        # self.current_torque_sensor = self.node.sdo['Torque sensor'].raw / 1000  # mN.m을 N.m으로 변환
+        return self.current_torque_sensor
+    
+    def get_velocity(self):
+        return self.velocity_actual_value
+    
+    def get_acceleration(self):
+        return self.current_acceleration
+
+    def get_status(self):
+        """모터의 전체 상태 정보를 반환하는 함수"""
+        status = {
+            'node_id': self.node_id,
+            'name': self.name,
+            'position': self.current_position if hasattr(self, 'current_position') else 0,
+            'torque': self.current_torque_sensor if hasattr(self, 'current_torque_sensor') else 0,
+            'velocity': self.velocity_actual_value if hasattr(self, 'velocity_actual_value') else 0
+        }
+        
+        # 모터 상태 정보 추가
+        if hasattr(self, 'motor_status'):
+            status.update({
+                'error': self.motor_status.get('fault', False),
+                'disabled': self.motor_status.get('switch_on_disabled', False),
+                'active': self.motor_status.get('operation_enabled', False),
+                'statusword': self.motor_status.get('statusword', 0),
+                'warning': self.motor_status.get('warning', False),
+                'ready': self.motor_status.get('ready_to_switch_on', False)
+            })
+        
+        return status
+   
+
+
+    def set_velocity(self, value):
+        """모터 속도 명령"""
+        print(f"[MotorVendorZeroErr] Set velocity to {value}, node: {self.node_id}")
+
+    def set_acceleration(self, value):
+        """모터 가속도 명령"""
+        print(f"[MotorVendorZeroErr] Set acceleration to {value}, node: {self.node_id}")
+
+    def set_position(self, value):  # value in radians        
+        """모터 위치 명령 (라디안 단위)"""
+        #print(f"[MotorVendorZeroErr] Set position to {value} rad, node: {self.node_id}")
+        self.node.rpdo[1]['Controlword'].phys = 0x2f
+        
+        # # 목표 위치를 라디안 단위로 저장
+        self.target_position = value
+        
+        # 라디안 값을 펄스로 변환한 후 zero_offset(펄스)을 더함
+        position_pulse = self._convert_rad_to_pulse(value) + self.zero_offset
+        self.node.rpdo[1]['Target Position'].phys = position_pulse
+        self.node.rpdo[1].transmit()
+
+        # print(f"zero_offset: {self.zero_offset} pulse, target_position_pulse: {position_pulse}")
+
+        self.node.rpdo[1]['Controlword'].phys = 0x3f
+        self.node.rpdo[1].transmit()        
+
+    def set_torque(self, value):        
+        self.target_torque = value * 1000 / self.motor_rated_current # mA
+
+        print(f"[MotorVendorZeroErr] Set torque to {self.target_torque}, node: {self.node_id}")
+        self.node.rpdo[1]['Controlword'].phys = 0x2f
+        self.target_torque = value
+        self.node.rpdo[1]['Target torque'].phys = self.target_torque
+        self.node.rpdo[1].transmit()
+
+        self.node.rpdo[1]['Controlword'].phys = 0x3f
+        self.node.rpdo[1].transmit()    
+
     def set_switchOn(self):
         print(f"[MotorVendorZeroErr] Set switch on, node: {self.node_id}")
         """self.node.rpdo[1]['Controlword'].phys = 0x26
@@ -204,58 +295,6 @@ class MotorVendorZeroErr(AbstractMotor):
 
         pass
 
-    def pdo_callback_register(self):
-        self.network.subscribe(self.node.tpdo[1].cob_id, self.node.tpdo[1].on_message)
-        self.node.tpdo[1].add_callback(self.tpdo1_callback)
-
-        self.network.subscribe(self.node.tpdo[2].cob_id, self.node.tpdo[2].on_message)
-        self.node.tpdo[2].add_callback(self.tpdo2_callback)
-
-    def set_position(self, value):  # value in radians        
-        """모터 위치 명령 (라디안 단위)"""
-        #print(f"[MotorVendorZeroErr] Set position to {value} rad, node: {self.node_id}")
-        self.node.rpdo[1]['Controlword'].phys = 0x2f
-        
-        # # 목표 위치를 라디안 단위로 저장
-        self.target_position = value
-        
-        # 라디안 값을 펄스로 변환한 후 zero_offset(펄스)을 더함
-        position_pulse = self._convert_rad_to_pulse(value) + self.zero_offset
-        self.node.rpdo[1]['Target Position'].phys = position_pulse
-        self.node.rpdo[1].transmit()
-
-        # print(f"zero_offset: {self.zero_offset} pulse, target_position_pulse: {position_pulse}")
-
-        self.node.rpdo[1]['Controlword'].phys = 0x3f
-        self.node.rpdo[1].transmit()
-        
-    def get_position(self):        
-        # self.current_position = self.node.sdo['Position actual value'].raw
-        # print(f"[MotorVendorZeroErr] Get position, node: {self.node_id}, position: {self.current_position}")
-        return self.current_position
-    
-    def set_torque(self, value):        
-        self.target_torque = value * 1000 / self.motor_rated_current # mA
-
-        print(f"[MotorVendorZeroErr] Set torque to {self.target_torque}, node: {self.node_id}")
-        self.node.rpdo[1]['Controlword'].phys = 0x2f
-        self.target_torque = value
-        self.node.rpdo[1]['Target torque'].phys = self.target_torque
-        self.node.rpdo[1].transmit()
-
-        self.node.rpdo[1]['Controlword'].phys = 0x3f
-        self.node.rpdo[1].transmit()       
-
-    def get_torque(self):        
-        # CANopen 노드에서 토크 값을 읽어옴
-        # self.current_torque_sensor = self.node.sdo['Torque sensor'].raw / 1000  # mN.m을 N.m으로 변환
-        return self.current_torque_sensor
-    
-    def get_velocity(self):
-        return self.velocity_actual_value
-    
-    def get_acceleration(self):
-        return self.current_acceleration
 
     def tpdo1_callback(self, message):
         # Statusword 읽기 (message.data의 첫 2바이트)
@@ -316,6 +355,7 @@ class MotorVendorZeroErr(AbstractMotor):
         self.current_position = (position - self.zero_offset) * self.plusToRad  # rad로 변환
         #print(f'TPDO1 Position actual value: {self.current_position}')
 
+    
     def tpdo2_callback(self, message):
         current_torque = int.from_bytes(message.data[0:3], byteorder='little', signed=True)  
 
@@ -343,36 +383,6 @@ class MotorVendorZeroErr(AbstractMotor):
                 f"{self.current_acceleration:.6f}"
             ])
 
-    def set_velocity(self, value):
-        """모터 속도 명령"""
-        print(f"[MotorVendorZeroErr] Set velocity to {value}, node: {self.node_id}")
-
-    def set_acceleration(self, value):
-        """모터 가속도 명령"""
-        print(f"[MotorVendorZeroErr] Set acceleration to {value}, node: {self.node_id}")
-
-    def get_status(self):
-        """모터의 전체 상태 정보를 반환하는 함수"""
-        status = {
-            'node_id': self.node_id,
-            'name': self.name,
-            'position': self.current_position if hasattr(self, 'current_position') else 0,
-            'torque': self.current_torque_sensor if hasattr(self, 'current_torque_sensor') else 0,
-            'velocity': self.velocity_actual_value if hasattr(self, 'velocity_actual_value') else 0
-        }
-        
-        # 모터 상태 정보 추가
-        if hasattr(self, 'motor_status'):
-            status.update({
-                'error': self.motor_status.get('fault', False),
-                'disabled': self.motor_status.get('switch_on_disabled', False),
-                'active': self.motor_status.get('operation_enabled', False),
-                'statusword': self.motor_status.get('statusword', 0),
-                'warning': self.motor_status.get('warning', False),
-                'ready': self.motor_status.get('ready_to_switch_on', False)
-            })
-        
-        return status
 
 # 다음 개선 사항:
 # 1. MotorVendorElmo 클래스에도 동일한 Status word 감시 기능 구현 필요
